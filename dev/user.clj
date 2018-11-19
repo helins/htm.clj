@@ -12,6 +12,7 @@
             [criterium.core                  :as ct]
             [dvlopt.htm                      :as htm]
             [dvlopt.htm.sdr                  :as htm.sdr]
+            [dvlopt.htm.util                 :as htm.util]
             [dvlopt.void                     :as void]))
 
 
