@@ -96,8 +96,7 @@
                                                                 i
                                                                 active?))
                                                       (transient sdr)
-                                                      i->active?))))
-        )))
+                                                      i->active?)))))))
         
 
 
@@ -274,7 +273,7 @@
 
 (defn P-exact-match
 
-  "Computes the propability of an exact match between two random SDRs.
+  "Computes the propability of an exact match between two random SDRs with the same properties.
 
 
    Cf. [1] Equation 2"
@@ -288,72 +287,78 @@
 
 
 
-(defn count-matching-SDRs
+(defn count-inexact-patterns
 
-  "For any SDR `x`, computes the number of similar random SDRs matching `x`.
+  "Computes the number of patterns matching an SDR for exactly `overlap-score` active bits.
+
+   Patterns can be subsamples where `cardinality-subsample` < `cardinality`.
   
 
-   Cf. [1] Equation 3"
+   Cf. [1] Equation 3, 6"
 
-  ([capacity cardinality overlap-score]
+  ([capacity overlap-score cardinality]
 
-   (count-matching-SDRs capacity
-                        cardinality
-                        cardinality
-                        overlap-score))
+   (count-inexact-patterns capacity
+                           overlap-score
+                           cardinality
+                           cardinality))
 
 
-  ([capacity cardinality-x cardinality-other overlap-score]
+  ([capacity overlap-score cardinality cardinality-subsample]
 
    #_(when (or (> overlap-score
-                cardinality-x)
+                cardinality)
              (> overlap-score
-                cardinality-other))
+                cardinality-subsample))
      (throw (IllegalArgumentException. "Overlap score must be <= cardinality")))
-   (*' (htm.util/count-combinations cardinality-other
-                                    overlap-score)
-       (htm.util/count-combinations (- capacity
-                                       cardinality-x)
-                                    (- cardinality-other
-                                       overlap-score)))))
+
+   (*' (count-patterns cardinality-subsample
+                       overlap-score)
+       (count-patterns (- capacity
+                          cardinality-subsample)
+                       (- cardinality
+                          overlap-score)))))
 
 
 
 
 (defn P-inexact-match
 
-  "Computes the propability of an inexact match between two random SDRs (ie. false positive match).
-
-   A false positive happens when two random SDRs match inexactly but not exactly.
-
-   In order to be robust against noise, an inexact match is a lot more useful than an exact one. However, this also rises the
-   probability of a false positive match and it is important to know how. The higher the capacity and the overlap
-   score, the lower the probability.
+  "Computes the propability of an inexact match between two random SDRs either sharing the same properties or one being
+   a subsample (`cardinality-subsample` < `cardinality`).
+ 
+   In order to be robust against noise, an inexact match is a lot more useful than an exact one. The probability of an
+   inexact match represent the probability of a false positive. If both SDRs have the same cardinality, that would be
+   the occurence of an inexact match despite the fact they do not match exactly. When subsampling, that would be an
+   inexact match despite the fact the subsample is not subsampled from the tested SDR.
+ 
+ 
+   The higher the capacity and the overlap score, the lower probability.
   
   
-   Cf. [1] Equation 4"
+   Cf. [1] Equation 4, 7"
 
-  ([capacity cardinality minimal-overlap-score]
+  ([capacity min-overlap-score cardinality]
 
    (P-inexact-match capacity
+                    min-overlap-score
                     cardinality
-                    cardinality
-                    minimal-overlap-score))
+                    cardinality))
 
 
-  ([capacity cardinality-1 cardinality-2 minimal-overlap-score]
+  ([capacity min-overlap-score cardinality cardinality-subsample]
 
    (/ (reduce (fn numerator [sum overlap-score]
                 (+' sum
-                    (count-matching-SDRs capacity
-                                         cardinality-1
-                                         cardinality-2
-                                         overlap-score)))
+                    (count-inexact-patterns capacity
+                                            overlap-score
+                                            cardinality
+                                            cardinality-subsample)))
               0
-              (range minimal-overlap-score
-                     (inc cardinality-2)))
-      (htm.util/count-combinations capacity
-                                   cardinality-2))))
+              (range min-overlap-score
+                     (inc cardinality-subsample)))
+      (count-patterns capacity
+                      cardinality))))
 
 
 
@@ -362,23 +367,23 @@
 
   "Approximates efficiently the result of `P-inexact-match`.
 
-   Specially precise when `cardinality-2` > 7 and `overlap-score` > (/ `cardinality` 2)
+   Specially precise when cardinality > 7 and overlap-score` > (/ cardinality` 2).
 
 
    Cf. [1] Equation 5"
 
-  ([capacity cardinality overlap-score]
+  ([capacity overlap-score cardinality]
 
    (P-approx-inexact-match capacity
+                           overlap-score
                            cardinality
-                           cardinality
-                           overlap-score))
+                           cardinality))
 
 
-  ([capacity cardinality-1 cardinality-2 overlap-score]
-   (/ (count-matching-SDRs capacity
-                           cardinality-1
-                           cardinality-2
-                           overlap-score)
-      (htm.util/count-combinations capacity
-                                   cardinality-2))))
+  ([capacity overlap-score cardinality cardinality-subsample]
+   (/ (count-inexact-patterns capacity
+                              overlap-score
+                              cardinality
+                              cardinality-subsample)
+      (count-patterns capacity
+                      cardinality-subsample))))
