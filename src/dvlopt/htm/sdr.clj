@@ -11,18 +11,102 @@
 
   (:require [dvlopt.htm      :as htm]
             [dvlopt.htm.util :as htm.util]
-            [dvlopt.void     :as void]))
+            [dvlopt.void     :as void])
+  (:import clojure.lang.Seqable))
 
 
 
 
-;;;;;;;;;;
+;;;;;;;;;; Protocol
 
 
-(defn sdr
+(defprotocol ISDR
 
-  "Creates a new SDR.
+  "Basic functions for implementing a SDR."
+
+  (active-bit? [sdr i]
+
+    "Is the `i`iest bit active in this SDR ?")
+
+
+  (capacity [sdr]
+
+    "How many bits is this SDR composed of ?")
+
+
+  (serialize [sdr]
+
+    "Transforms this SDR into a byte array.")
+
+
+  (set-bit [sdr i active?]
+
+    "Sets the `i`th bit in this SDR.")
+
+
+  (set-bits [sdr i->active?]
+
+    "Efficiently sets the required bits in this SDR following a map of index -> boolean."))
+
+
+
+
+;;;;;;;;;; Creating SDRs
+
+
+(defn immutable-SDR-from
+
+  "Creates a new immutable SDR from a sequence."
+
+  [sq]
+
+  (let [sdr       (into []
+                        (map boolean)
+                        sq)
+        capacity' (count sdr)]
+    (reify
+
+      Seqable
+
+        (seq [_]
+          (seq sdr))
+
+
+      ISDR
+
+        (active-bit? [_ i]
+          (get sdr
+               i))
   
+        (capacity [_]
+          capacity')
+
+        (serialize [_]
+          (into-array Boolean/TYPE
+                      sdr))
+
+        (set-bit [_ i active?]
+          (immutable-SDR-from (assoc sdr
+                                     i
+                                     (boolean active?))))
+
+        (set-bits [_ i->active?]
+          (immutable-SDR-from (persistent! (reduce-kv (fn update-bit [sdr' i active?]
+                                                        (assoc! sdr'
+                                                                i
+                                                                active?))
+                                                      (transient sdr)
+                                                      i->active?))))
+        )))
+        
+
+
+
+(defn immutable-SDR
+
+  "Creates a new immutable SDR.
+  
+
    A map of options may be given :
   
      ::capacity
@@ -30,57 +114,62 @@
 
   ([]
 
-   (sdr nil))
+   (immutable-SDR nil))
 
 
   ([options]
 
-   (vec (repeat (void/obtain ::capacity
-                             options
-                             htm/defaults)
-                false))))
+   (immutable-SDR-from (repeat (void/obtain ::capacity
+                                            options
+                                            htm/defaults)
+                               false))))
 
 
 
 
-(defn active-bit?
+(defn deserialize-immutable-SDR
 
-  "Is the ith bit active in the given SDR ?"
+  "Deserialize an immutable SDR."
 
-  [sdr i]
+  [ba]
 
-  (get sdr
-       i))
-
-
+  (immutable-SDR-from (map nat-int?
+                           ba)))
 
 
-(defn capacity
 
-  "What is the capacity of the given SDR ?"
 
-  [sdr]
+;;;;;;;;;; Functions manipulating SDRs based on the basic functions defined in the protocol
 
-  (count sdr))
+
+(defn active-bits
+
+  "Lazily computes a sorted list containing indices of active bits from this SDR."
+
+  ([sdr]
+
+   (filter (fn test-unit [i]
+             (active-bit? sdr
+                          i))
+           (range (capacity sdr)))))
 
 
 
 
 (defn cardinality
 
-  "What is the number of active bits in the given SDR ?"
+  "What is the number of active units in the given SDR ?"
 
   [sdr]
 
-  (count (filter true?
-                 sdr)))
+  (count (active-bits sdr)))
 
 
 
 
 (defn sparsity
 
-  "Sparsity if the cardinality of the SDR divided by its capacity."
+  "Sparsity if the cardinality of this SDR divided by its capacity."
 
   [sdr]
 
@@ -92,40 +181,36 @@
 
 (defn union
 
-  "OR the given SDRs."
+  "Lazily computes a sequence representing the union of all the fiven SDRs.
+  
+  
+   Cf. [1] Section G"
 
   [& sdrs]
 
   (when (some identity
               sdrs)
-    (into []
-          (map (fn check-bit [i]
-                 (boolean (some (fn find-active-bit [sdr]
-                                  (active-bit? sdr
-                                               i))
-                                sdrs)))
-               (range (capacity (first sdrs)))))))
+    (map (fn check-bit [i]
+           (boolean (some (fn find-active-bit [sdr]
+                            (active-bit? sdr
+                                         i))
+                          sdrs)))
+         (range (capacity (first sdrs))))))
 
 
 
 
 (defn overlap
 
-  "Computes the set of bits active in both SDRs.
-
-   Returns a set of indices."
+  "Lazy computes a sorted list of bits active in both SDRs."
 
   [sdr-1 sdr-2]
 
-  (reduce (fn check-bit [overlapping-bits i]
-            (if (and (active-bit? sdr-1
-                                  i)
-                     (active-bit? sdr-2
-                                  i))
-              (conj overlapping-bits
-                    i)
-              overlapping-bits))
-          #{}
+  (filter (fn check-bit [i]
+            (and (active-bit? sdr-1
+                              i)
+                 (active-bit? sdr-2
+                              i)))
           (range (capacity sdr-1))))
 
 
@@ -143,26 +228,33 @@
 
 
 
-(defn match?
+(defn match-inexactly?
 
-  "Do those two SDRs match ?
-  
-   Not providing a required minimal overlap-score will test for a perfect match."
+  "Do those two SDRs have at least `overlap-score` active bits in common ?"
 
-  ([sdr-1 sdr-2]
+  [overlap-score sdr-1 sdr-2]
 
-   (match? (cardinality sdr-1)
-           sdr-1
-           sdr-2))
+  (>= (dvlopt.htm.sdr/overlap-score sdr-1
+                                    sdr-2)
+      overlap-score))
 
 
-  ([overlap-score sdr-1 sdr-2]
-
-   (>= (dvlopt.htm.sdr/overlap-score sdr-1
-                                     sdr-2)
-       overlap-score)))
 
 
+(defn match-exactly?
+
+  "Do those two SDRs match exactly ?"
+
+  [sdr-1 sdr-2]
+
+  (match-inexactly? (cardinality sdr-1)
+                    sdr-1
+                    sdr-2))
+
+
+
+
+;;;;;;;;;; Functions computing some useful properties
 
 
 (defn count-patterns
@@ -213,7 +305,7 @@
 
   ([capacity cardinality-x cardinality-other overlap-score]
 
-   (when (or (> overlap-score
+   #_(when (or (> overlap-score
                 cardinality-x)
              (> overlap-score
                 cardinality-other))

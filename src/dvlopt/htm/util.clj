@@ -1,6 +1,6 @@
 (ns dvlopt.htm.util
 
-  ""
+  "Utility functions."
 
   {:author "Adam Helinski"})
 
