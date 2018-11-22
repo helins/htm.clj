@@ -2,6 +2,7 @@
 
   "Sparse Distributed Representations.
   
+
    Based on :
 
      [1] Ahmad, S., & Hawkins, J. (2015). Properties of sparse distributed representations and their application to hierarchical
@@ -147,7 +148,7 @@
 
   ([sdr]
 
-   (filter (fn test-unit [i]
+   (filter (fn test-bit [i]
              (active-bit? sdr
                           i))
            (range (capacity sdr)))))
@@ -170,17 +171,23 @@
 
   "Sparsity if the cardinality of this SDR divided by its capacity."
 
-  [sdr]
+  ([sdr]
 
-  (/ (cardinality sdr)
-     (capacity sdr)))
+   (sparsity (capacity sdr)
+             (cardinality sdr)))
+
+
+  ([capacity cardinality]
+
+   (/ cardinality
+      capacity)))
 
 
 
 
 (defn union
 
-  "Lazily computes a sequence representing the union of all the fiven SDRs.
+  "Lazily computes a sequence representing the union of all the given SDRs.
   
   
    Cf. [1] Section G"
@@ -199,7 +206,7 @@
 
 
 
-(defn overlap
+(defn overlapping-bits
 
   "Lazy computes a sorted list of bits active in both SDRs."
 
@@ -221,8 +228,8 @@
 
   [sdr-1 sdr-2]
 
-  (count (overlap sdr-1
-                  sdr-2)))
+  (count (overlapping-bits sdr-1
+                           sdr-2)))
 
 
 
@@ -290,11 +297,11 @@
 (defn count-inexact-patterns
 
   "Computes the number of patterns matching an SDR for exactly `overlap-score` active bits.
-
-   Patterns can be subsamples where `cardinality-subsample` < `cardinality`.
   
+   They can have different cardinalities which is useful in the context of subsampling and unions.
 
-   Cf. [1] Equation 3, 6"
+
+   Generalization of [1] Equation 3, 6, and 14."
 
   ([capacity overlap-score cardinality]
 
@@ -304,19 +311,13 @@
                            cardinality))
 
 
-  ([capacity overlap-score cardinality cardinality-subsample]
+  ([capacity overlap-score cardinality-1 cardinality-2]
 
-   #_(when (or (> overlap-score
-                cardinality)
-             (> overlap-score
-                cardinality-subsample))
-     (throw (IllegalArgumentException. "Overlap score must be <= cardinality")))
-
-   (*' (count-patterns cardinality-subsample
+   (*' (count-patterns cardinality-1
                        overlap-score)
        (count-patterns (- capacity
-                          cardinality-subsample)
-                       (- cardinality
+                          cardinality-1)
+                       (- cardinality-2
                           overlap-score)))))
 
 
@@ -324,19 +325,18 @@
 
 (defn P-inexact-match
 
-  "Computes the propability of an inexact match between two random SDRs either sharing the same properties or one being
-   a subsample (`cardinality-subsample` < `cardinality`).
+  "Computes the propability of an inexact match between two random SDRs (at least `min-overlap-score` active bits in common).
+   
+   They can have different cardinalities which is useful in the context of subsampling and unions.
  
    In order to be robust against noise, an inexact match is a lot more useful than an exact one. The probability of an
-   inexact match represent the probability of a false positive. If both SDRs have the same cardinality, that would be
-   the occurence of an inexact match despite the fact they do not match exactly. When subsampling, that would be an
-   inexact match despite the fact the subsample is not subsampled from the tested SDR.
- 
- 
-   The higher the capacity and the overlap score, the lower probability.
+   inexact match represent the probability of a false positive. The higher the capacity and the overlap score, the lower
+   probability.
+
+   Linear with respect to (min cardinality-1 cardinality-2).
   
   
-   Cf. [1] Equation 4, 7"
+   Generalization of [1] Equation 4, 7, and 15"
 
   ([capacity min-overlap-score cardinality]
 
@@ -346,19 +346,20 @@
                     cardinality))
 
 
-  ([capacity min-overlap-score cardinality cardinality-subsample]
+  ([capacity min-overlap-score cardinality-1 cardinality-2]
 
-   (/ (reduce (fn numerator [sum overlap-score]
-                (+' sum
-                    (count-inexact-patterns capacity
-                                            overlap-score
-                                            cardinality
-                                            cardinality-subsample)))
-              0
-              (range min-overlap-score
-                     (inc cardinality-subsample)))
+   (/ (transduce (map (fn count-inexact-patterns' [overlap-score]
+                        (count-inexact-patterns capacity
+                                                overlap-score
+                                                cardinality-1
+                                                cardinality-2)))
+                 +'
+                 (let [exclusive-max-overlap-score (inc (min cardinality-1
+                                                             cardinality-2))]
+                   (range min-overlap-score
+                          exclusive-max-overlap-score)))
       (count-patterns capacity
-                      cardinality))))
+                      cardinality-2))))
 
 
 
@@ -380,10 +381,75 @@
                            cardinality))
 
 
-  ([capacity overlap-score cardinality cardinality-subsample]
+  ([capacity overlap-score cardinality-1 cardinality-2]
    (/ (count-inexact-patterns capacity
                               overlap-score
-                              cardinality
-                              cardinality-subsample)
+                              cardinality-1
+                              cardinality-2)
       (count-patterns capacity
-                      cardinality-subsample))))
+                      cardinality-2))))
+
+
+
+
+(defn P-inactive-union-bit
+
+  "Computes the probability that a given bit is inactive in a union of patterns.
+
+
+   Cf. [1] Equation 12"
+
+  [pattern-count capacity cardinality]
+
+  (Math/pow (- 1
+               (sparsity capacity
+                         cardinality))
+            pattern-count))
+
+
+
+
+(defn P-active-union-bit
+
+  "Opposite of `P-inactive-union-bit`."
+
+  [pattern-count capacity cardinality]
+
+  (- 1
+     (P-inactive-union-bit pattern-count
+                           capacity
+                           cardinality)))
+
+
+
+
+(defn P-exact-union-match
+
+  "Computes the probability of a pattern exactly matching a pattern within a union of patterns.
+
+
+   Cf. [1] Equation 13"
+
+  [pattern-count capacity cardinality-2]
+
+  (Math/pow (P-active-union-bit pattern-count
+                                capacity
+                                cardinality-2)
+            cardinality-2))
+
+
+
+
+(defn expected-union-cardinality
+
+  "Computes the expected cardinality of a union of patterns.
+  
+
+   Cf. [1] Section G and H"
+
+  [pattern-count capacity cardinality-2]
+
+  (* capacity
+     (P-active-union-bit pattern-count
+                         capacity
+                         cardinality-2)))
