@@ -121,3 +121,26 @@
                              (dec overflow)
                              true)
       sdr'2)))
+
+
+
+
+(defn categorical-encoding
+
+  "Representations of categories do not have overlapping active bits."
+
+  [input->index sdr input]
+
+  (let [sdr'        (htm.sdr/clear sdr)
+        cardinality (quot (htm.sdr/capacity sdr)
+                          (count input->index))
+        low-bit     (* (or (input->index input)
+                           (throw (IllegalArgumentException. (format "Unknown category: %s"
+                                                                     input))))
+                       cardinality)
+        high-bit    (+ low-bit
+                       (dec cardinality))]
+    (htm.sdr/set-bit-range sdr'
+                           low-bit
+                           high-bit
+                           true)))
