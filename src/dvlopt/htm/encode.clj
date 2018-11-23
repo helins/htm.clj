@@ -127,16 +127,21 @@
 
 (defn categorical-encoding
 
-  "Representations of categories do not have overlapping active bits."
+  "Representations of categories do not have overlapping active bits.
 
-  [input->index sdr input]
+   A category is actually just an integer between 0 (inclusive) and `category-count` (exclusive).
+
+   The cardinality is the result of the natural division of the capacity of the SDR and `category-count`.
+
+
+   Based on [1] Section 4."
+
+  [category-count sdr category]
 
   (let [sdr'        (htm.sdr/clear sdr)
         cardinality (quot (htm.sdr/capacity sdr)
-                          (count input->index))
-        low-bit     (* (or (input->index input)
-                           (throw (IllegalArgumentException. (format "Unknown category: %s"
-                                                                     input))))
+                          category-count)
+        low-bit     (* category
                        cardinality)
         high-bit    (+ low-bit
                        (dec cardinality))]
