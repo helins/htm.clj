@@ -35,6 +35,11 @@
     "How many bits is this SDR composed of ?")
 
 
+  (clear [sdr]
+
+    "Turns off all bits in this SDR.")
+
+
   (serialize [sdr]
 
     "Transforms this SDR into a byte array.")
@@ -43,6 +48,11 @@
   (set-bit [sdr i active?]
 
     "Sets the `i`th bit in this SDR.")
+
+
+  (set-bit-range [sdr i j active?]
+
+    "Sets bits from `i` to `j` (both inclusive) in this SDR.")
 
 
   (set-bits [sdr i->active?]
@@ -82,17 +92,30 @@
         (capacity [_]
           capacity')
 
+        (clear [_]
+          (immutable-SDR-from (repeat capacity'
+                                      false)))
+
         (serialize [_]
           (into-array Boolean/TYPE
                       sdr))
 
         (set-bit [_ i active?]
           (immutable-SDR-from (assoc sdr
-                                     i
+                                     ^long i
                                      (boolean active?))))
 
+        (set-bit-range [_ i j active?]
+          (immutable-SDR-from (persistent! (reduce (fn update-bit-in-range [sdr' ^long i']
+                                                     (assoc! sdr'
+                                                             i'
+                                                             active?))
+                                                   (transient sdr)
+                                                   (range i
+                                                          (inc j))))))
+
         (set-bits [_ i->active?]
-          (immutable-SDR-from (persistent! (reduce-kv (fn update-bit [sdr' i active?]
+          (immutable-SDR-from (persistent! (reduce-kv (fn update-bit [sdr' ^long i active?]
                                                         (assoc! sdr'
                                                                 i
                                                                 active?))
