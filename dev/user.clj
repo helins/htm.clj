@@ -11,7 +11,7 @@
             [clojure.test                    :as t]
             [criterium.core                  :as ct]
             [dvlopt.htm                      :as htm]
-            [dvlopt.htm.encode               :as htm.encode]
+            [dvlopt.htm.encoder              :as htm.encoder]
             [dvlopt.htm.sdr                  :as htm.sdr]
             [dvlopt.htm.sdr.props            :as htm.sdr.props]
             [dvlopt.htm.util                 :as htm.util]
