@@ -47,3 +47,23 @@
                        k)
                     -1))
      (factorial k)))
+
+
+
+
+(defn normalize
+
+  "Normalizes a numerical value between `min-value` and `max-value`.
+  
+   Values out of range are treated as extreme values."
+
+  [min-value max-value value]
+
+  (let [constrained-value (-> value
+                              (max min-value)
+                              (min max-value))
+        value-range       (- max-value
+                             min-value)]
+    (/ (- constrained-value
+          min-value)
+       value-range)))

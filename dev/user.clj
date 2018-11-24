@@ -13,6 +13,7 @@
             [dvlopt.htm                      :as htm]
             [dvlopt.htm.encode               :as htm.encode]
             [dvlopt.htm.sdr                  :as htm.sdr]
+            [dvlopt.htm.sdr.props            :as htm.sdr.props]
             [dvlopt.htm.util                 :as htm.util]
             [dvlopt.void                     :as void]))
 

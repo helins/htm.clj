@@ -1,6 +1,9 @@
 (ns dvlopt.htm.encode
 
   "Encoders mapping arbitrary values to SDRs.
+
+   
+   This is the entry point of any HTM system, inputs in various formats have to be translated into SDRs.
   
   
    Based on :
@@ -9,8 +12,10 @@
 
   {:author "Adam Helinski"}
 
-  (:require [dvlopt.htm     :as htm]
-            [dvlopt.htm.sdr :as htm.sdr]))
+  (:require [dvlopt.htm           :as htm]
+            [dvlopt.htm.sdr       :as htm.sdr]
+            [dvlopt.htm.sdr.props :as htm.sdr.props]
+            [dvlopt.htm.util      :as htm.util]))
 
 
 
@@ -18,44 +23,12 @@
 ;;;;;;;;;; Linear encoding
 
 
-(defn- -cardinality
-
-  ;; Computes the required cardinality given a capacity and a sparsity.
-
-  ^long
-
-  [capacity sparsity]
-
-  (min capacity
-       (Math/round ^double (* capacity
-                              sparsity))))
-
-
-
-
-(defn- -normalized-scalar-input
-
-  ;; Helper for linear encoding.
-
-  [min-bound max-bound input]
-
-  (let [constrained-input (-> input
-                              (max min-bound)
-                              (min max-bound))
-        input-range       (- max-bound
-                             min-bound)]
-    (/ (- constrained-input
-          min-bound)
-       input-range)))
-
-
-
-
 (defn linear-encoding
 
   "Linear encoding for scalar inputs.
   
-   Inputs are normalized within `min-bound` and `max-bound`.
+   Inputs are normalized within `min-bound` and `max-bound` and out-of-range inputs are treated as
+   extreme values.
   
   
    Generalization of [1] Section 3.1."
@@ -66,11 +39,11 @@
 
   (let [sdr'              (htm.sdr/clear sdr)
         capacity          (htm.sdr/capacity sdr')
-        cardinality       (-cardinality capacity
-                                        sparsity)
-        normalized-input  (-normalized-scalar-input min-bound
-                                                    max-bound
-                                                    input)
+        cardinality       (htm.sdr.props/cardinality capacity
+                                                     sparsity)
+        normalized-input  (htm.util/normalize min-bound
+                                              max-bound
+                                              input)
         low-bit           (Math/round ^double (* normalized-input
                                                  (- capacity
                                                     cardinality)))
@@ -98,11 +71,11 @@
 
   (let [sdr'              (htm.sdr/clear sdr)
         capacity          (htm.sdr/capacity sdr')
-        cardinality       (-cardinality capacity
-                                        sparsity)
-        normalized-input  (-normalized-scalar-input min-bound
-                                                    max-bound
-                                                    input)
+        cardinality       (htm.sdr.props/cardinality capacity
+                                                     sparsity)
+        normalized-input  (htm.util/normalize min-bound
+                                              max-bound
+                                              input)
         last-bit          (dec capacity)
         low-bit           (Math/round ^double (* normalized-input
                                                  last-bit))
