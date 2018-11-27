@@ -59,11 +59,19 @@
      n-minicols
        Total number of mini-columns.
 
+     overlap-score
+       Number of currently active input bits a mini-column is currently connected to.
+
      potential-density
        During initialization, the percentage of input bits that are sampled for creating a `potential-pool`.
 
      potential-pool
        The set of `i-bit`s a `i-minicol` can potentially connect to.
+
+     stimulus-threshold
+       During inference, in order for a mini-column to even be considered potentially active, it must have an `overlap-score` of at least that much. During
+       initialization, it is important to garantee that at least `stimulus-threshold` connections are randomly established for each mini-column otherwise
+       they will never have the chance to compete. This parameter is a measure against noise and should be low. For practical use, it could even be 0.
   "
 
   {:author "Adam Helinski"}
@@ -110,12 +118,7 @@
 
   "Initializes the connection in a `potential-pool`.
   
-   Returns a vector of `i-minicol` -> `input-connection`."
-
-  ;; TODO. Stimulus threshold. During inference, the overlap between a mini-column and the active input bits must be >
-  ;; than this small threshold for the column to even be considered active. It is a measure against noise.
-  ;; During initialization, each minicolumn should have at least more established connections than that, otherwise it will
-  ;; not stand a chance later during the inhibitation phase.
+   Returns a vector of `i-minicol` -> `input-connections`."
 
   ;; TODO. Connections are often weighted by the distance between i-minicol and i-bit, which requires the dimensionality
   ;; of the input-space as well as the dimensionality the mini-columnar topography. Typically, a mini-column is supposed
@@ -142,9 +145,7 @@
                    (let [connected? (< (rng)
                                        connection-density)
                          x          (rng)
-                         connection (htm.util/constrain-number 0
-                                                               1
-                                                               (+ connection-threshold
+                         connection (htm.util/constrain-number (+ connection-threshold
                                                                   (* connection-delta
                                                                      (if connected?
                                                                        x
@@ -153,3 +154,33 @@
                       connection]))
                  potential-i-bits))
          potential-pool)))
+
+
+
+
+(defn adjust-to-stimulus-threshold
+
+  "For each mini-column, raises the input connections until that mini-column has at least `stimulus-threshold` established
+   connections."
+
+  [connection-threshold stimulus-threshold connection-increment i-minicol->input-connections]
+
+  (if (zero? stimulus-threshold)
+    i-minicol->input-connections
+    (mapv (fn handlec-connections [input-connections]
+            (let [n-connected (count (filter (fn connected? [[_ connection]]
+                                               (>= connection
+                                                   connection-threshold))
+                                             input-connections))]
+              (if (>= n-connected
+                      stimulus-threshold)
+                (vec input-connections)
+                (recur (map (fn raise-connections [[i-bit connection :as tuple]]
+                              (if (>= connection
+                                      connection-threshold)
+                                tuple
+                                [i-bit
+                                 (htm.util/constrain-number (+ connection
+                                                               connection-increment))]))
+                            input-connections)))))
+          i-minicol->input-connections)))

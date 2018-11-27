@@ -53,13 +53,22 @@
 
 (defn constrain-number
 
-  "Returns x' constrained to be between `min-value` and `max-value` inclusive."
+  "Returns x' constrained to be between `min-value` and `max-value` inclusive.
+  
+   Boundaries are 0 and 1 if not given."
 
-  [min-value max-value x]
+  ([x]
 
-  (-> x
-      (max min-value)
-      (min max-value)))
+   (constrain-number 0
+                     1
+                     x))
+
+
+  ([min-value max-value x]
+
+   (-> x
+       (max min-value)
+       (min max-value))))
 
 
 
@@ -98,10 +107,8 @@
 
   "Returns a sequence sampling `n` ints from an int array using a random number generator.
 
-   The array must not be mutated before the sequence is realized.
 
-  
-   <!> The array will be shuffled."
+   <!> The array will be shuffled and must not be mutated before the sequence is realized."
 
   [rng n ^ints array-int]
 
