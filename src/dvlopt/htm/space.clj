@@ -40,9 +40,14 @@
 
      coordinates
        Vector expressing the location of an item, such as the location of an input-bit in a 2D input space.
+       Can be computed from an `index`, which would be a bit like folding a dimension into an N dimensional space.
+
+     dimensions
+       Vector defining an N dimensional space (eg. a 2D 32x64 grid is [32 64]).
 
      index
-       The index of an item regardless of its dimensionality (eg. an input bit located at [4 10] in a 2D 32 x 64 grid would have an index of (+ (* 4 64) 10).
+       The index of an item regardless of its dimensionality (eg. an input bit located at [4 10] in a 2D 32x64 grid would have an index of (+ (* 4 64) 10).
+       It is like unfolding an N dimensional space into a single dimension.
 
      i-bit
        The `index` of an input bit in the input space.
@@ -54,7 +59,7 @@
        Tuple [`i-bit` `connection`].
 
      n-bits
-       Total number of input bits in the input space.
+       Total number of input bits in the input space or a subset of the input space.
 
      n-minicols
        Total number of mini-columns.
@@ -83,6 +88,110 @@
 
 
 ;;;;;;;;;;
+
+
+(defn normalize-coordinates
+
+  "Normalizes `coordinates` within an N dimensional space defined by `dimensions`"
+
+  [dimensions coordinates]
+
+  (mapv (fn normalize-coordinate [capacity-dimension coordinate]
+          (double (/ coordinate
+                     capacity-dimension)))
+        dimensions
+        coordinates))
+
+
+
+
+(defn denormalize-coordinates
+
+  "Does the opposite of `normalize-coordinates`."
+
+  [dimensions normalized-coordinates]
+
+  (mapv (fn denormalize-coordinate [capacity-dimension normalized-coordinate]
+          (htm.util/round(* capacity-dimension
+                            normalized-coordinate)))
+        dimensions
+        normalized-coordinates))
+
+
+
+
+(defn coordinates->index
+
+  "Computes the `index` of `coordinates` in an N dimensional space."
+
+  [dimensions coordinates]
+
+  (reduce-kv (fn add-dimension [index i-dimension capacity-dimension]
+               (+ (* index
+                     capacity-dimension)
+                  (get coordinates
+                       i-dimension)))
+             0
+             dimensions))
+
+
+
+
+(defn index->coordinates
+
+  "Computes the `coordinates` of an `index` in an N dimensional space."
+
+  [dimensions index]
+
+  (let [n-dimensions (count dimensions)
+        coordinates  (int-array n-dimensions)]
+    (aset-int coordinates
+              0
+              (reduce (fn compute-dimension [index' i-dimension]
+                        (let [capacity-dimension (get dimensions
+                                                      i-dimension)]
+                          (aset-int coordinates
+                                    i-dimension
+                                    (rem index'
+                                         capacity-dimension))
+                          (/ index'
+                             capacity-dimension)))
+                      index
+                      (range (dec n-dimensions)
+                             0
+                             -1)))
+    (vec coordinates)))
+
+
+
+
+(defn coord-center-input
+
+  "Maps mini-column `coordinates` to the `coordinates` of an associated center input bit (ie. the natural center of a mini-column
+   within the input space)."
+
+  [dim-input dim-minicol coord-minicol]
+
+  (denormalize-coordinates dim-input
+                           (normalize-coordinates dim-minicol
+                                                  coord-minicol)))
+
+
+
+
+(defn i-center-input
+
+  "Like `coord-center-input` but works with indexes."
+
+  [dim-input dim-minicol i-minicol]
+
+  (coordinates->index dim-input
+                      (coord-center-input dim-input
+                                          dim-minicol
+                                          (index->coordinates dim-minicol
+                                                              i-minicol))))
+
+
 
 
 (defn potential-pool
