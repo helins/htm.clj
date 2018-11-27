@@ -14,6 +14,7 @@
             [dvlopt.htm.encoder              :as htm.encoder]
             [dvlopt.htm.sdr                  :as htm.sdr]
             [dvlopt.htm.sdr.props            :as htm.sdr.props]
+            [dvlopt.htm.space                :as htm.space]
             [dvlopt.htm.util                 :as htm.util]
             [dvlopt.void                     :as void]))
 
