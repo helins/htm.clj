@@ -107,7 +107,7 @@
 
 (defn denormalize-coordinates
 
-  "Does the opposite of `normalize-coordinates`."
+  "Does the opposite of `normalize-coordinates` while rounding coordinates to integers."
 
   [dimensions normalized-coordinates]
 
@@ -190,6 +190,79 @@
                                           dim-minicol
                                           (index->coordinates dim-minicol
                                                               i-minicol))))
+
+
+
+
+(defn hypercube
+
+  "Returns a vector expressing a hypercube in an N dimensional space.
+  
+   Each item is a 2-tuple forming an inclusive interval in the corresponding dimension.
+  
+   The hypercube is truncated if it goes beyond the original N dimensional space unless `wrapping?` is set to
+   true, in which case it wraps around to the other side."
+
+  ;; TODO. Constrained hypercube.
+  ;; MAYBEDO. Generalize to hyperrectangles, quite easy to do.
+
+  ([dimensions radius coord-center]
+
+   (hypercube false
+              dimensions
+              radius
+              coord-center))
+
+
+  ([wrapping? dimensions radius coord-center]
+
+   (reduce-kv (fn i-dim-range [hypercube i-dimension capacity-dimension]
+                (let [i-coordinate (get coord-center
+                                        i-dimension)
+                      left         (- i-coordinate
+                                      radius)
+                      right        (+ i-coordinate
+                                      radius)]
+                  (conj hypercube
+                        (if wrapping?
+                          [left
+                           right]
+                          [(max 0
+                                left)
+                           (min (dec capacity-dimension)
+                                right)]))))
+              []
+              dimensions)))
+
+
+
+
+(defn dim-hypercube
+
+  "Transforms a `hypercube` into a well-formed N dimension space."
+
+  [hypercube]
+
+  (reduce (fn capacity-dimension [dim-hypercube' [min-coord max-coord]]
+            (conj dim-hypercube'
+                  (- (inc max-coord)
+                     min-coord)))
+          []
+          hypercube))
+
+
+
+
+(defn space-capacity
+
+  "Computes the total capacity of an N dimensional space."
+
+  [space]
+
+  (reduce *
+          space))
+
+
 
 
 
