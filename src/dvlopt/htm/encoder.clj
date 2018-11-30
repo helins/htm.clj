@@ -20,7 +20,7 @@
   (:require [dvlopt.htm           :as htm]
             [dvlopt.htm.sdr       :as htm.sdr]
             [dvlopt.htm.sdr.props :as htm.sdr.props]
-            [dvlopt.htm.util      :as htm.util]))
+            [dvlopt.htm.math      :as htm.math]))
 
 
 
@@ -46,9 +46,9 @@
         max-bound'  (- capacity
                        cardinality)]
     (fn encode-linear [sdr input]
-      (let [normalized-input  (htm.util/normalize min-bound
-                                                  max-bound
-                                                  input)
+      (let [normalized-input  (htm.math/min-max-normalization min-bound
+                                                              max-bound
+                                                              input)
             low-bit           (Math/round ^double (* normalized-input
                                                      max-bound'))
             high-bit          (+ low-bit
@@ -75,9 +75,9 @@
   (let [high-offset (dec cardinality)
         last-bit    (dec capacity)]
     (fn encode-cyclic-linear [sdr input]
-      (let [normalized-input  (htm.util/normalize min-bound
-                                                  max-bound
-                                                  input)
+      (let [normalized-input  (htm.math/min-max-normalization min-bound
+                                                              max-bound
+                                                              input)
             low-bit           (Math/round ^double (* normalized-input
                                                      last-bit))
             high-bit          (+ low-bit

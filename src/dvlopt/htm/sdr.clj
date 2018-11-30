@@ -9,7 +9,6 @@
 
   (:require [dvlopt.htm           :as htm]
             [dvlopt.htm.sdr.props :as htm.sdr.props]
-            [dvlopt.htm.util      :as htm.util]
             [dvlopt.void          :as void])
   (:import clojure.lang.Seqable))
 

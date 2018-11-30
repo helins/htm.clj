@@ -90,8 +90,8 @@
 
   {:author "Adam Helinski"}
 
-  (:require [dvlopt.htm.sdr.props :as htm.sdr.props]
-            [dvlopt.htm.util      :as htm.util]))
+  (:require [dvlopt.htm.math      :as htm.math]
+            [dvlopt.htm.sdr.props :as htm.sdr.props]))
 
 
 
@@ -121,7 +121,7 @@
   [dimensions normalized-coordinates]
 
   (mapv (fn denormalize-coordinate [capacity-dimension normalized-coordinate]
-          (htm.util/round (* capacity-dimension
+          (htm.math/round (* capacity-dimension
                              normalized-coordinate)))
         dimensions
         normalized-coordinates))
@@ -288,7 +288,7 @@
 
   (reduce (fn capacity-dimension [dim-hypercube' [min-coord max-coord]]
             (conj dim-hypercube'
-                  (+ (htm.util/abs min-coord)
+                  (+ (htm.math/abs min-coord)
                      max-coord
                      1)))
           []
@@ -362,9 +362,9 @@
 
   ([dim-input n-sample rng]
 
-   (htm.util/reservoir-sample-indexes rng
-                                      n-sample
-                                      (space-capacity dim-input))))
+   (htm.math/reservoir-sample-ints rng
+                                   (space-capacity dim-input)
+                                   n-sample)))
 
 
 
@@ -458,10 +458,10 @@
    (map (fn permanence [connected?]
           (let [connection-delta' (* connection-delta
                                      (rng))]
-            (htm.util/constrain-number (+ connection-threshold
-                                          (if connected?
-                                            connection-delta'
-                                            (- connection-delta'))))))
+            (htm.math/fit-to-range (+ connection-threshold
+                                      (if connected?
+                                        connection-delta'
+                                        (- connection-delta'))))))
         (concat (repeat n-connections
                         true)
                 (repeat (- n-potential

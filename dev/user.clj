@@ -12,10 +12,10 @@
             [criterium.core                  :as ct]
             [dvlopt.htm                      :as htm]
             [dvlopt.htm.encoder              :as htm.encoder]
+            [dvlopt.htm.math                 :as htm.math]
             [dvlopt.htm.sdr                  :as htm.sdr]
             [dvlopt.htm.sdr.props            :as htm.sdr.props]
             [dvlopt.htm.space                :as htm.space]
-            [dvlopt.htm.util                 :as htm.util]
             [dvlopt.void                     :as void]))
 
 

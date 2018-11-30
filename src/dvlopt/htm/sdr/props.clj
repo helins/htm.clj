@@ -14,7 +14,7 @@
 
   {:author "Adam Helinski"}
 
-  (:require [dvlopt.htm.util :as htm.util]))
+  (:require [dvlopt.htm.math :as htm.math]))
 
 
 
@@ -58,8 +58,8 @@
 
   [capacity cardinality]
 
-  (htm.util/count-combinations capacity
-                               cardinality))
+  (htm.math/n-combinations capacity
+                           cardinality))
 
 
 
