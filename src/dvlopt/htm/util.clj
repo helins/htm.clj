@@ -92,6 +92,19 @@
 
 
 
+(defn abs
+
+  "Returns the absolute value."
+
+  [x]
+
+  (if (neg? x)
+    (- x)
+    x))
+
+
+
+
 (defn round
 
   "Rounds a number."
@@ -103,12 +116,35 @@
 
 
 
+(defn random-int
+
+  "Using a given random number generator for numbers between 0 (inclusive) and 1 (exclusive), generates an integer
+   between `min-int` (inclusive) and `max-int` (exclusive)."
+
+  ([rng max-int]
+
+   (long (* (rng)
+            max-int)))
+
+
+  ([rng min-int max-int]
+
+   (long (+ (* (rng)
+                (- max-int
+                   min-int))
+             min-int))))
+
+
+
+
 (defn sample-ints
 
   "Returns a sequence sampling `n` ints from an int array using a random number generator.
 
 
    <!> The array will be shuffled and must not be mutated before the sequence is realized."
+
+  ;; TODO. Not needed as reservoir sampling is more efficient ?
 
   [rng n ^ints array-int]
 
@@ -130,3 +166,29 @@
                   i-bit)))
     (take n
           array-int)))
+
+
+
+
+(defn reservoir-sample-indexes
+
+  "Randomly samples `n-sample` indexes between 0 (inclusive) and `n-total` (exclusive)."
+
+  [rng n-sample n-total]
+
+  (loop [indexes! (transient (vec (range 0
+                                         n-sample)))
+         i        n-sample]
+    (if (>= i
+            n-total)
+      (persistent! indexes!)
+      (let [j (random-int rng
+                          0
+                          i)]
+        (recur (if (< j
+                      n-sample)
+                 (assoc! indexes!
+                         j
+                         i)
+                 indexes!)
+               (inc i))))))

@@ -165,6 +165,40 @@
 
 
 
+(defn wrap-coordinate
+
+  "Wraps a coordinate to a dimension."
+
+  [capacity-dimension coordinate]
+
+  (let [i-last      (dec capacity-dimension)
+        coordinate' (rem coordinate
+                         capacity-dimension)]
+    (if (neg? coordinate')
+      (+ capacity-dimension
+         coordinate')
+      (let [overflow (- coordinate'
+                        i-last)]
+        (if (pos? overflow)
+          overflow
+          coordinate')))))
+
+
+
+
+(defn wrap-coordinates
+
+  "Wraps coordinates to an N dimensional space."
+
+  [dim-input coordinates]
+
+  (mapv wrap-coordinate
+        dim-input
+        coordinates))
+
+
+
+
 (defn coord-center-input
 
   "Maps mini-column `coordinates` to the `coordinates` of an associated center input bit (ie. the natural center of a mini-column
@@ -245,8 +279,9 @@
 
   (reduce (fn capacity-dimension [dim-hypercube' [min-coord max-coord]]
             (conj dim-hypercube'
-                  (- (inc max-coord)
-                     min-coord)))
+                  (+ (htm.util/abs min-coord)
+                     max-coord
+                     1)))
           []
           hypercube))
 
@@ -263,6 +298,91 @@
           space))
 
 
+
+
+(defn index->hypercube-coordinates
+
+  "Computes the `coordinates` of an index within a hypercube."
+
+  ([hypercube index]
+
+   (index->hypercube-coordinates hypercube
+                                 (dim-hypercube hypercube)
+                                 index))
+
+
+  ([hypercube dim-hypercube index]
+
+   (mapv (fn ??? [[min-dim max-dim] coordinate]
+           ;; Wrap or not to wrap ?
+           (+ coordinate
+              min-dim))
+         hypercube
+         (index->coordinates dim-hypercube
+                             index))))
+
+
+
+
+(defn potential-hypercube
+
+  "For `i-minicol`, computes the hypercube in the input space where potential connections should be sampled."
+
+  [dim-input potential-radius dim-minicol i-minicol]
+
+  (hypercube dim-input
+             potential-radius
+             (coord-center-input dim-input
+                                 dim-minicol
+                                 (index->coordinates dim-minicol
+                                                     i-minicol))))
+
+
+
+
+(defn sample-inputs
+
+  "Samples `i-input` from the whole input space."
+
+  ([dim-input n-sample]
+
+   (sample-inputs dim-input
+                  n-sample
+                  rand))
+
+
+  ([dim-input n-sample rng]
+
+   (htm.util/reservoir-sample-indexes rng
+                                      n-sample
+                                      (space-capacity dim-input))))
+
+
+
+
+(defn sample-potential-hypercube
+
+  "Sample `n-sample` input bits from a potential hypercube of inputs."
+
+  ([dim-input potential-hypercube n-sample]
+
+   (sample-potential-hypercube dim-input
+                               potential-hypercube
+                               n-sample
+                               rand))
+
+  ([dim-input potential-hypercube n-sample rng]
+
+   (let [dim-hypercube' (dim-hypercube potential-hypercube)]
+     (mapv (fn space-index [index]
+             (->> (index->hypercube-coordinates potential-hypercube
+                                                dim-hypercube'
+                                                index)
+                  (wrap-coordinates dim-input)
+                  (coordinates->index dim-input)))
+           (sample-inputs dim-hypercube'
+                          n-sample
+                          rng)))))
 
 
 
