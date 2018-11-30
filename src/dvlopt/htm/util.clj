@@ -137,39 +137,6 @@
 
 
 
-(defn sample-ints
-
-  "Returns a sequence sampling `n` ints from an int array using a random number generator.
-
-
-   <!> The array will be shuffled and must not be mutated before the sequence is realized."
-
-  ;; TODO. Not needed as reservoir sampling is more efficient ?
-
-  [rng n ^ints array-int]
-
-  (let [i-last (dec (count array-int))]
-    (dotimes [i-sample n]
-      (let [i-bit    (aget array-int
-                           i-sample)
-            j-sample (+ i-sample
-                        (round (* (rng)
-                                  (- i-last
-                                     i-sample))))
-            j-bit    (aget array-int
-                           j-sample)]
-        (aset-int array-int
-                  i-sample
-                  j-bit)
-        (aset-int array-int
-                  j-sample
-                  i-bit)))
-    (take n
-          array-int)))
-
-
-
-
 (defn reservoir-sample-indexes
 
   "Randomly samples `n-sample` indexes between 0 (inclusive) and `n-total` (exclusive)."

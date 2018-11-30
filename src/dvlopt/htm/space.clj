@@ -26,21 +26,30 @@
    Glossary :
 
 
+     center-input
+       When relevant, a minicolumn might have a natural center in the input space.
+
      connection
-       Value between 0 and 1 expressing the strengh of a synaptic connection.
+       A connection is made when `permanence` >= `connection-threshold`.
 
      connection-delta
-       During connections initialization, radius around the `connection-threshold` for randomly choosing an initial `connection`.
+       During connections initialization, radius around the `connection-threshold` for randomly choosing an initial `permanence`.
 
      connection-density
        Percentage of `connection`s above `connection-threshold`.
 
      connection-threshold
-       Treshold for deciding if a `connection` is strong enough for the synapse to be fully connected.
+       Treshold for deciding if a `permanence` is strong enough for establishing a `connection`.
 
-     coordinates
-       Vector expressing the location of an item, such as the location of an input-bit in a 2D input space.
-       Can be computed from an `index`, which would be a bit like folding a dimension into an N dimensional space.
+     coordinate, coord
+       Integer expression the location of an item in a dimension, such as the location of an input bit.
+
+     coordinates, coords
+       Vector of `coordinate`s expressing a location in an N dimensional space.
+       Can be computed from an index, which would be a bit like folding a single dimension into an N dimensional space.
+
+     coords-center-input
+       Coordinate of a `center-input`
 
      dimensions
        Vector defining an N dimensional space (eg. a 2D 32x64 grid is [32 64]).
@@ -49,16 +58,13 @@
        The index of an item regardless of its dimensionality (eg. an input bit located at [4 10] in a 2D 32x64 grid would have an index of (+ (* 4 64) 10).
        It is like unfolding an N dimensional space into a single dimension.
 
-     i-bit
+     i-input
        The `index` of an input bit in the input space.
 
      i-minicol
        The `index` of a mini column.
 
-     input-connection
-       Tuple [`i-bit` `connection`].
-
-     n-bits
+     n-inputs
        Total number of input bits in the input space or a subset of the input space.
 
      n-minicols
@@ -67,16 +73,19 @@
      overlap-score
        Number of currently active input bits a mini-column is currently connected to.
 
+     permanence, perm
+       Value between 0 and 1 (inclusive) for deciding, in conjunction with a `connection-threshold`, if a `connection` is established.
+
      potential-density
        During initialization, the percentage of input bits that are sampled for creating a `potential-pool`.
 
      potential-pool
-       The set of `i-bit`s a `i-minicol` can potentially connect to.
+       The set of `i-input`s a `i-minicol` can potentially connect to.
 
      stimulus-threshold
        During inference, in order for a mini-column to even be considered potentially active, it must have an `overlap-score` of at least that much. During
        initialization, it is important to garantee that at least `stimulus-threshold` connections are randomly established for each mini-column otherwise
-       they will never have the chance to compete. This parameter is a measure against noise and should be low. For practical use, it could even be 0.
+       they will never have the chance to compete. This parameter is a measure against noise and should be low. It could even be 0.
   "
 
   {:author "Adam Helinski"}
@@ -96,7 +105,7 @@
 
   [dimensions coordinates]
 
-  (mapv (fn normalize-coordinate [capacity-dimension coordinate]
+  (mapv (fn normalize-coord [capacity-dimension coordinate]
           (double (/ coordinate
                      capacity-dimension)))
         dimensions
@@ -112,8 +121,8 @@
   [dimensions normalized-coordinates]
 
   (mapv (fn denormalize-coordinate [capacity-dimension normalized-coordinate]
-          (htm.util/round(* capacity-dimension
-                            normalized-coordinate)))
+          (htm.util/round (* capacity-dimension
+                             normalized-coordinate)))
         dimensions
         normalized-coordinates))
 
@@ -387,102 +396,74 @@
 
 
 
-(defn potential-pool
+(defn local-potential-pool
 
-  "Returns a vector of `i-minicol` -> `potential-pool`."
+  "Samples `n-potential-connections` for `i-minicol` from a potential hypercube around its natural center in the
+   input space."
 
-  ;; TODO. The potential radius delimits a hypercube in the input space around a center i-bits where the i-bits are sampled
-  ;; for a mini-column. For now, i-bits are sampled from the whole input space.
+  ([dim-input dim-minicol i-minicol potential-radius n-potential-connections]
 
-  ([n-minicols n-bits potential-density]
-
-   (potential-pool n-minicols
-                   n-bits
-                   potential-density
-                   rand))
-
-
-  ([n-minicols n-bits potential-density rng]
-
-   (let [n-bits-per-minicol (htm.util/round (* n-bits
-                                               potential-density))
-         i-bits             (int-array (range n-bits))]
-     (mapv (fn sample-i-bits [_]
-             (vec (htm.util/sample-ints rng
-                                        n-bits-per-minicol
-                                        i-bits)))
-           (range n-minicols)))))
+   (local-potential-pool dim-input
+                         dim-minicol
+                         i-minicol
+                         potential-radius
+                         n-potential-connections
+                         rand))
 
 
+  ([dim-input dim-minicol i-minicol potential-radius n-potential-connections rng]
+
+   (sample-potential-hypercube dim-input
+                               (hypercube dim-input
+                                          potential-radius
+                                          (coord-center-input dim-input
+                                                              dim-minicol
+                                                              (index->coordinates dim-minicol
+                                                                                  i-minicol)))
+                               n-potential-connections
+                               rng)))
 
 
-(defn init-connections
 
-  "Initializes the connection in a `potential-pool`.
+
+(defn init-permanences
+
+  "Returns a sequence of `n-potential` permanence values. Around `connection-density` percent should be above `connection-threshold`.
+   Those permanences will span between `connection-threshold` +/- `connection-delta`.
   
-   Returns a vector of `i-minicol` -> `input-connections`."
+   Keep in mind `n-connections` should be >= the stimulus threshold later used otherwise the mini-column associated with those
+   initial permanences will not have a chance of ever be considered active."
 
-  ;; TODO. Connections are often weighted by the distance between i-minicol and i-bit, which requires the dimensionality
+  ;; In order to symplify the work, the returned sequences contains the connected permanences first and disconnected last.
+
+
+  ;; TODO. Connections are often weighted by the distance between i-minicol and i-input, which requires the dimensionality
   ;; of the input-space as well as the dimensionality the mini-columnar topography. Typically, a mini-column is supposed
-  ;; to be biased towards a natural center (ie. center i-bit).
-
-  ;; TODO. Does the RNG really need to be called twice ? Might be expensive.
+  ;; to be biased towards a natural center (ie. i-center-bit).
 
   ;; MAYBEDO. In the Python implementation, connections < some small threshold called 'synPermTrimThreshold' are zeroed
   ;; for "reducing memory requirements". Unclear how that would help here
 
-  ([potential-pool connection-density connection-threshold connection-delta]
+  ([n-potential n-connections connection-threshold connection-delta]
 
-   (init-connections potential-pool
-                     connection-density
+   (init-permanences n-potential
+                     n-connections
                      connection-threshold
                      connection-delta
                      rand))
 
 
-  ([potential-pool connection-density connection-threshold connection-delta rng]
+  ([n-potential n-connections connection-threshold connection-delta rng]
 
-   (mapv (fn set-connections [potential-i-bits]
-           (mapv (fn set-connection [potential-i-bit]
-                   (let [connected? (< (rng)
-                                       connection-density)
-                         x          (rng)
-                         connection (htm.util/constrain-number (+ connection-threshold
-                                                                  (* connection-delta
-                                                                     (if connected?
-                                                                       x
-                                                                       (- x)))))]
-                     [potential-i-bit
-                      connection]))
-                 potential-i-bits))
-         potential-pool)))
-
-
-
-
-(defn adjust-to-stimulus-threshold
-
-  "For each mini-column, raises the input connections until that mini-column has at least `stimulus-threshold` established
-   connections."
-
-  [connection-threshold stimulus-threshold connection-increment i-minicol->input-connections]
-
-  (if (zero? stimulus-threshold)
-    i-minicol->input-connections
-    (mapv (fn handlec-connections [input-connections]
-            (let [n-connected (count (filter (fn connected? [[_ connection]]
-                                               (>= connection
-                                                   connection-threshold))
-                                             input-connections))]
-              (if (>= n-connected
-                      stimulus-threshold)
-                (vec input-connections)
-                (recur (map (fn raise-connections [[i-bit connection :as tuple]]
-                              (if (>= connection
-                                      connection-threshold)
-                                tuple
-                                [i-bit
-                                 (htm.util/constrain-number (+ connection
-                                                               connection-increment))]))
-                            input-connections)))))
-          i-minicol->input-connections)))
+   (map (fn permanence [connected?]
+          (let [connection-delta' (* connection-delta
+                                     (rng))]
+            (htm.util/constrain-number (+ connection-threshold
+                                          (if connected?
+                                            connection-delta'
+                                            (- connection-delta'))))))
+        (concat (repeat n-connections
+                        true)
+                (repeat (- n-potential
+                           n-connections)
+                        false)))))
