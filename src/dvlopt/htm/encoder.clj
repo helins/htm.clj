@@ -49,8 +49,8 @@
       (let [normalized-input  (htm.math/min-max-normalization min-bound
                                                               max-bound
                                                               input)
-            low-bit           (Math/round ^double (* normalized-input
-                                                     max-bound'))
+            low-bit           (htm.math/round (* normalized-input
+                                                 max-bound'))
             high-bit          (+ low-bit
                                  high-offset)]
         (htm.sdr/set-bit-range sdr
@@ -78,8 +78,8 @@
       (let [normalized-input  (htm.math/min-max-normalization min-bound
                                                               max-bound
                                                               input)
-            low-bit           (Math/round ^double (* normalized-input
-                                                     last-bit))
+            low-bit           (htm.math/round (* normalized-input
+                                                 last-bit))
             high-bit          (+ low-bit
                                  high-offset)
             sdr'              (htm.sdr/set-bit-range sdr

@@ -44,20 +44,27 @@
 
 (defn fit-to-range
 
-  "Returns x' constrained to be between `min-value` and `max-value` inclusive.
+  "Returns value' constrained to be between `min-value` and `max-value` inclusive.
   
    Boundaries are 0 and 1 if not given."
 
-  ([x]
+  ([value]
 
    (fit-to-range 0
                  1
-                 x))
+                 value))
 
 
-  ([min-value max-value x]
+  ([max-value value]
 
-   (-> x
+   (fit-to-range 0
+                 max-value
+                 value))
+
+
+  ([min-value max-value value]
+
+   (-> value
        (max min-value)
        (min max-value))))
 
@@ -142,6 +149,7 @@
 
   ([rng ^long min-int ^long max-int n-sample]
 
+   (println :min min-int :max max-int :n n-sample :rng rng)
    (loop [ints! (transient (vec (range min-int
                                        n-sample)))
           i     n-sample]
@@ -169,3 +177,43 @@
   [^double x]
 
   (Math/round x))
+
+
+
+
+(defn wrap-to-range
+
+  "Like `fit-to-range` but the value is wrapped as if the range was cyclic.
+  
+
+   Ex. (wrap-to-range 0
+                      10
+                      -3)
+       => 6"
+
+  ([value]
+
+   (wrap-to-range 0
+                  1
+                  value))
+
+
+  ([max-value value]
+
+   (wrap-to-range 0
+                  max-value
+                  value))
+
+
+  ([min-value max-value value]
+
+   (let [value' (rem (- value
+                        min-value)
+                     (- max-value
+                        min-value))]
+     (if (neg? value')
+       (+ max-value
+          1
+          value')
+       (+ min-value
+          value')))))
