@@ -145,6 +145,29 @@
 
 
 
+(defn random-connections
+
+  "Returns a random vector of `n-potential` connections with `n-connections`."
+
+  ([n-potential n-connections]
+
+   (random-connections n-potential
+                       n-connections
+                       rand))
+
+
+  ([n-potential n-connections rng]
+
+   (htm.math/durstenfeld-shuffle rng
+                                 (concat (repeat n-connections
+                                                 true)
+                                         (repeat (- n-potential
+                                                    n-connections)
+                                                 false)))))
+
+
+
+
 (defn init-permanences
 
   "Returns a sequence of `n-potential` permanence values. Around `connection-density` percent should be above `connection-threshold`.
@@ -181,8 +204,36 @@
                                       (if connected?
                                         connection-delta'
                                         (- connection-delta'))))))
-        (concat (repeat n-connections
-                        true)
-                (repeat (- n-potential
-                           n-connections)
-                        false)))))
+        (random-connections n-potential
+                            n-connections
+                            rng))))
+
+
+
+
+(defn global-mapping
+
+  "Returns a vector of where each index is a `i-input` point to a vector of [i-minicol permanence]."
+
+  [grid-inputs grid-minicols n-potential n-connections connection-threshold connection-delta rng]
+
+  (reduce (fn init-minicol [i-inputs i-minicol]
+            (reduce (fn add-minicol [i-inputs' [i-input permanence]]
+                      (assoc i-inputs'
+                             i-input
+                             (conj (get i-inputs'
+                                        i-input)
+                                   [i-minicol permanence])))
+                    i-inputs
+                    (partition 2
+                               (interleave (global-potential-pool grid-inputs
+                                                                  n-potential
+                                                                  rng)
+                                           (init-permanences n-potential
+                                                             n-connections
+                                                             connection-threshold
+                                                             connection-delta
+                                                             rng)))))
+          (vec (repeat (htm.grid/grid-capacity grid-inputs)
+                       []))
+          (range (htm.grid/grid-capacity grid-minicols))))

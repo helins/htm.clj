@@ -135,6 +135,37 @@
 
 
 
+(defn durstenfeld-shuffle
+
+  "Durstenfeld version of the Fisher-Yates shuffle."
+
+  [rng collection]
+
+  (let [collection! (transient (vec collection))
+        size        (count collection!)
+        limit       (- size
+                       2)]
+    (loop [i 0]
+      (if (<= i
+              limit)
+        (let [j (random-int rng
+                            i
+                            size)
+              i-val (get collection!
+                         i)]
+          (assoc! collection!
+                  i
+                  (get collection!
+                       j))
+          (assoc! collection!
+                  j
+                  i-val)
+          (recur (inc i)))
+        (persistent! collection!)))))
+
+
+
+
 (defn reservoir-sample-ints
 
   "Randomly samples `n-sample` integers between `min-int` (inclusive, defaults to 0) and `max-int` (exclusive)."
@@ -149,23 +180,21 @@
 
   ([rng ^long min-int ^long max-int n-sample]
 
-   (println :min min-int :max max-int :n n-sample :rng rng)
-   (loop [ints! (transient (vec (range min-int
-                                       n-sample)))
-          i     n-sample]
-     (if (>= i
-             max-int)
-       (persistent! ints!)
-       (let [j (random-int rng
-                           0
-                           i)]
-         (recur (if (< j
-                       n-sample)
-                  (assoc! ints!
-                          j
-                          i)
-                  ints!)
-                (inc i)))))))
+   (let [ints! (transient (vec (range min-int
+                                      n-sample)))]
+     (loop [i n-sample]
+       (if (< i
+              max-int)
+         (let [j (random-int rng
+                             0
+                             i)]
+           (when (< j
+                    n-sample)
+             (assoc! ints!
+                     j
+                     i))
+           (recur (inc i)))
+         (persistent! ints!))))))
 
 
 
