@@ -237,3 +237,51 @@
           (vec (repeat (htm.grid/grid-capacity grid-inputs)
                        []))
           (range (htm.grid/grid-capacity grid-minicols))))
+
+
+
+
+(defn overlap-score
+
+  "Given a sequence of `fi-inputs`, computes the `overlap-score` for every mini-column."
+
+  [connection-threshold global-mapping fi-inputs]
+
+  (reduce (fn compute-fi-input [i-minicol->overlap-score fi-input]
+            (reduce (fn update-minicol [i-minicol->overlap-score' [i-minicol perm]]
+                      (if (>= perm
+                              connection-threshold)
+                        (assoc i-minicol->overlap-score'
+                               i-minicol
+                               (inc (get i-minicol->overlap-score'
+                                         i-minicol
+                                         0)))
+                        i-minicol->overlap-score'))
+                    i-minicol->overlap-score
+                    (get global-mapping
+                         fi-input)))
+          {}
+          fi-inputs))
+
+
+
+
+(defn global-inhibition
+
+  "Using `overlap-score`s of mini-columns, performs global inhibition by selecting `n` `i-minicols` with
+   the best `overlap`."
+
+  ;; TODO. Tie breaker.
+  ;; TODO. Stimulus threshold.
+
+  [i-minicol->overlap n]
+
+  (take n
+        (sort-by (fn by-overlap [[_i-minicol overlap-score]]
+                   overlap-score)
+                 (reify java.util.Comparator
+
+                   (compare [_ x y]
+                     (- (compare x
+                                 y))))
+                 i-minicol->overlap)))
