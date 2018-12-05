@@ -71,6 +71,29 @@
 
 
 
+(defn mean
+
+  "Computes the mean of a sequence."
+
+  [sq]
+
+  (loop [i   0
+         sum 0
+         sq' sq]
+    (if-let [sq'2 (seq sq')]
+      (recur (inc i)
+             (+ sum
+                (first sq'2))
+             (rest sq'2))
+      (if (zero? i)
+        0
+        (/ sum
+           i)))))
+
+
+
+
+
 (defn min-max-normalization
 
   "Normalizes a numerical value between `min-value` and `max-value`.

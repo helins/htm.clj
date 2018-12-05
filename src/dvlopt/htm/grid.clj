@@ -325,3 +325,44 @@
          (sample-grid (hypercube->grid hypercube)
                       n-sample
                       rng))))
+
+
+
+
+;;;;;;;;;; Misc
+
+
+(defn dim-ranges
+
+  "Given a sequence of `coordinates` in a `grid`, returns a vector of [min-coord max-coord] for every dimension."
+
+  [grid seq-coords]
+
+  (reduce (fn update-dim-ranges  [min-maxs coords]
+            (mapv (fn by-dim [[min-coord max-coord] coord]
+                    [(min min-coord
+                          coord)
+                     (max max-coord
+                          coord)])
+
+                  min-maxs
+                  coords))
+          (mapv (fn init-dim-range [coord]
+                  [coord
+                   coord])
+                (first seq-coords))
+          (rest seq-coords)))
+
+
+
+
+(defn dim-span
+
+  "Given `dim-ranges`, computes the span for every dimension."
+
+  [dim-ranges]
+
+  (mapv (fn by-dim [[min-coord max-coord]]
+          (- max-coord
+             min-coord))
+        dim-ranges))

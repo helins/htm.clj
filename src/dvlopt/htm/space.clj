@@ -266,6 +266,77 @@
 
 
 
+(defn overlap-score-2
+
+  "Given a sequence of `fi-inputs`, computes the `overlap-score` for every mini-column."
+
+  [connection-threshold n-minicols global-mapping fi-inputs]
+
+  (reduce (fn compute-fi-input [i-minicol->overlap-score fi-input]
+            (reduce (fn update-minicol [^ints i-minicol->overlap-score' [i-minicol perm]]
+                      (when (>= perm
+                                connection-threshold)
+                        (aset-int i-minicol->overlap-score'
+                                  i-minicol
+                                  (inc (aget i-minicol->overlap-score'
+                                             i-minicol))))
+                      i-minicol->overlap-score')
+                    i-minicol->overlap-score
+                    (get global-mapping
+                         fi-input)))
+          (int-array n-minicols)
+          fi-inputs))
+
+
+
+
+(defn overlap-score-3
+
+  "Given a sequence of `fi-inputs`, computes the `overlap-score` for every mini-column."
+
+  [connection-threshold n-minicols global-mapping fi-inputs]
+
+  (let [i-minicol->overlap-score (int-array n-minicols)]
+    (dotimes [i (count fi-inputs)]
+      (let [minicol-perms (get global-mapping
+                               i)]
+        (dotimes [j (count minicol-perms)]
+          (let [[i-minicol
+                 perm]     (get minicol-perms
+                                j)]
+            (when (>= perm
+                      connection-threshold)
+              (aset-int i-minicol->overlap-score
+                        i-minicol
+                        (inc (aget i-minicol->overlap-score
+                                   i-minicol))))))))
+    i-minicol->overlap-score))
+
+
+
+
+(defn overlap-score-4
+
+  "Given a sequence of `fi-inputs`, computes the `overlap-score` for every mini-column."
+
+  [connection-threshold n-minicols global-mapping fi-inputs]
+
+  (let [i-minicol->overlap-score (int-array n-minicols)]
+    (doseq [fi-input fi-inputs]
+      (doseq [[i-minicol
+               perm]     (get global-mapping
+                              fi-input)]
+        (when (>= perm
+                  connection-threshold)
+          (aset-int i-minicol->overlap-score
+                    i-minicol
+                    (inc (aget i-minicol->overlap-score
+                               i-minicol))))))
+    i-minicol->overlap-score))
+
+
+
+
 (defn global-inhibition
 
   "Using `overlap-score`s of mini-columns, performs global inhibition by selecting `n` `i-minicols` with
@@ -285,3 +356,89 @@
                      (- (compare x
                                  y))))
                  i-minicol->overlap)))
+
+
+
+
+(defn avg-inputs-minicols-ratio
+
+  "Computes, on average, the number of mini-columns existing for every input bit."
+
+  [grid-inputs grid-minicols]
+
+  (htm.math/mean (map /
+                      grid-minicols
+                      grid-inputs)))
+
+
+
+
+(defn fi-minicol->connections
+
+  "Returns a vector of `fi-minicol` -> vector of `fi-inputs` with established connections."
+
+  [n-minicols connection-threshold mapping]
+
+  (reduce-kv (fn by-fi-input [fi-minicol->fi-inputs fi-input minicol-permanences]
+               (reduce (fn by-fi-minicol [fi-minicol->fi-inputs' [fi-minicol perm]]
+                         (if (>= perm
+                                 connection-threshold)
+                           (update fi-minicol->fi-inputs'
+                                   fi-minicol
+                                   conj
+                                   fi-input)
+                           fi-minicol->fi-inputs'))
+                       fi-minicol->fi-inputs
+                       minicol-permanences))
+             (vec (repeat n-minicols
+                          []))
+             mapping))
+
+
+
+
+(defn receptive-field
+
+  "Given a list of `fi-input` of established connections, computes the receptive field of a mini-column."
+
+  [grid-inputs connections]
+
+  (htm.grid/dim-span (htm.grid/dim-ranges grid-inputs
+                                          (map (fn to-coords [fi-input]
+                                                 (htm.grid/f-index->coords grid-inputs
+                                                                           fi-input))
+                                               connections))))
+
+
+
+
+(defn inhibition-radius
+
+  "Computes the inhibition radius for local inhibition."
+
+  [grid-inputs avg-inputs-minicols-ratio fi-minicol->connections]
+
+  (let [avg-receptive-field (htm.math/mean (map htm.math/mean
+                                                (map (fn compute-rf [connections]
+                                                       (receptive-field grid-inputs
+                                                                        connections))
+                                                     fi-minicol->connections)))
+        diameter            (* avg-receptive-field
+                               avg-inputs-minicols-ratio)]
+    (max (htm.math/round (/ (dec diameter)
+                            2))
+         1)))
+
+
+
+
+(defn local-inhibition
+
+  ""
+
+  ;; TODO. Tie breaker.
+  ;; TODO. Stimulus threshold.
+
+  [i-minicol->overlap n]
+
+  )
