@@ -339,15 +339,15 @@
 
 (defn global-inhibition
 
-  "Using `overlap-score`s of mini-columns, performs global inhibition by selecting `n` `i-minicols` with
+  "Using `overlap-score`s of mini-columns, performs global inhibition by selecting `n-active` `i-minicols` with
    the best `overlap`."
 
-  ;; TODO. Tie breaker.
+  ;; TODO. Tie breaking, possiblity by using unstable sorting.
   ;; TODO. Stimulus threshold.
 
-  [i-minicol->overlap n]
+  [i-minicol->overlap n-active]
 
-  (take n
+  (take n-active
         (sort-by (fn by-overlap [[_i-minicol overlap-score]]
                    overlap-score)
                  (reify java.util.Comparator
@@ -434,11 +434,37 @@
 
 (defn local-inhibition
 
-  ""
+  "Using `overlap-score`s of mini-columns, performs a local inhibition."
 
-  ;; TODO. Tie breaker.
+  ;; TODO. Tie breaking by favoring already active mini-columns.
   ;; TODO. Stimulus threshold.
 
-  [i-minicol->overlap n]
+  [grid-minicols n-active inhibition-radius fi-minicol->overlap-score]
 
-  )
+  (reduce-kv (fn ??? [active-minicols fi-minicol overlap-score]
+               (let [neighborhood  (htm.grid/hypercube* grid-minicols
+                                                        inhibition-radius
+                                                        (htm.grid/f-index->coords grid-minicols
+                                                                                  fi-minicol))
+                     ;; TODO. Not always true, depends if the hypercube is wrapping or not.
+                     n-neighbors   (Math/pow inhibition-radius
+                                             (count grid-minicols))]
+                 (loop [fi-neighbor      0
+                        n-bigger-overlap 0]
+                   (if (< fi-neighbor
+                          n-neighbors)
+                     (let [n-bigger-overlap' (if (> (get fi-minicol->overlap-score
+                                                         (htm.grid/f-index->coords-hypercube neighborhood
+                                                                                             fi-neighbor))
+                                                    overlap-score)
+                                               (inc n-bigger-overlap)
+                                               n-bigger-overlap)]
+                       (if (< n-bigger-overlap'
+                              n-active)
+                         (recur (inc fi-neighbor)
+                                n-bigger-overlap')
+                         active-minicols))
+                     (conj active-minicols
+                           fi-minicol)))))
+             []
+             fi-minicol->overlap-score))
