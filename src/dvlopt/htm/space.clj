@@ -25,53 +25,75 @@
 
    Glossary :
 
+     active-inputs
+      Sequence of `input`s active as a result of some stimulus.
+
+     active-minicols
+      Sequence of `minicol`s active as a result of `active-inputs`.
 
      center-input
-       When relevant, a minicolumn might have a natural center in the input space.
+       When relevant, a `minicol` might have a natural center in the input space.
 
-     connection
-       A connection is made when `permanence` >= `connection-threshold`.
+     cnx, connection
+       A connection is made when `perm` >= `cnx-threshold``.
 
-     connection-delta
-       During connections initialization, radius around the `connection-threshold` for randomly choosing an initial `permanence`.
+     cnxs
+       Vector where indices are `minicol`s and item are vectors of `input`s with established connection.
 
-     connection-density
-       Percentage of `connection`s above `connection-threshold`.
+     cnx-threshold, connection-threshold
+       Treshold for deciding if a `perm` is strong enough for establishing a `cnx`.
 
-     connection-threshold
-       Treshold for deciding if a `permanence` is strong enough for establishing a `connection`.
+     flat-index
+       Cf. `flat-index` in `dvlopt.htm.grid` namespace.
 
+     grid
+       Cf. `grid` in `dvlopt.htm.grid` glossary.
 
-     coords-center-input
-       Coordinate of a `center-input`
+     grid-inputs
+       `grid` describing the topology of the input space.
 
-     dimensions
-       Vector defining an N dimensional space (eg. a 2D 32x64 grid is [32 64]).
+     grid-minicols
+       `grid describing the topology of `minicols`.
 
+     inhibition-radius
+       Radius around a `minicol` within `grid-minicols` where inhibition happens during local inhibition.
 
-     i-input
-       The `index` of an input bit in the input space.
+     input
+       Input bit represented by its `flat-index` within the `grid-inputs`.
 
-     i-minicol
-       The `index` of a mini column.
+     input-pool-mapping
+       Vector where indices represent `input`s and items are 2-tuples where the first element is a `minicol` and the second one is the offset of the
+       corresponding `input` in that `minicol`'s `pool`.
 
-     n-inputs
-       Total number of input bits in the input space or a subset of the input space.
+     minicol
+       Modelisation of a neocortical mini-column represented by its `flat-index` within the `grid-minicols`.
 
-     n-minicols
-       Total number of mini-columns.
+     n-pool
+       Size of a `pool`.
 
      overlap-score
-       Number of currently active input bits a mini-column is currently connected to.
+       Number of currently `active-inputs` a minicol is currently connected to.
 
-     permanence, perm
-       Value between 0 and 1 (inclusive) for deciding, in conjunction with a `connection-threshold`, if a `connection` is established.
+     overlap-scores
+       Vector of `overlap-score`s where each index represent `minicol`;
 
-     potential-density
-       During initialization, the percentage of input bits that are sampled for creating a `potential-pool`.
+     perm, permanence
+       Value between 0 and 1 (inclusive) for deciding, in conjunction with a `cnx-threshold`, if a `cnx` is established.
 
-     potential-pool
-       The set of `i-input`s a `i-minicol` can potentially connect to.
+     perms
+       Vector of `perm`s layed out in the same order as their corresponding `pool`.
+
+     perm-table
+       Vector of `perms` where each index represents a `minicol`. `perms` are layed out in the same order as corresponding `pool`s.
+
+     pool, potential-pool
+       Set of `input`s a `minicol` can potentially connect to.
+
+     pools, potential-pools
+       Vector of `pool`s where each index represents a `minicol`.
+
+     receptive-field
+       Span of `input`s within `grid-inputs` a `minicol` is currently connected to.
 
      stimulus-threshold
        During inference, in order for a mini-column to even be considered potentially active, it must have an `overlap-score` of at least that much. During
@@ -79,13 +101,10 @@
        they will never have the chance to compete. This parameter is a measure against noise and should be low. It could even be 0.
   "
 
-  ;; TODO. Update glossary now that there is a namespace for grids.
-
   {:author "Adam Helinski"}
 
-  (:require [dvlopt.htm.grid      :as htm.grid]
-            [dvlopt.htm.math      :as htm.math]
-            [dvlopt.htm.sdr.props :as htm.sdr.props]))
+  (:require [dvlopt.htm.grid :as htm.grid]
+            [dvlopt.htm.math :as htm.math]))
 
 
 
@@ -93,91 +112,86 @@
 ;;;;;;;;;;
 
 
-(defn local-potential-pool
+(defn local-pool
 
-  "Samples `n-potential-connections` for `i-minicol` from a potential hypercube around its natural center in the
-   input space."
+  "Creates a `pool` for the given `minicol` by sampling `input`s from a hypercube around the `minicol`'s corresponding `center-input`
+   in `grid-inputs`."
 
   ;; TODO. Wrapping etc ?
 
-  ([grid-inputs potential-radius n-potential-connections grid-minicols i-minicol]
+  ([grid-inputs potential-radius n-pool grid-minicols minicol]
 
-   (local-potential-pool grid-inputs
-                         potential-radius
-                         n-potential-connections
-                         grid-minicols
-                         i-minicol
-                         rand))
+   (local-pool grid-inputs
+               potential-radius
+               n-pool
+               grid-minicols
+               minicol
+               rand))
 
 
-  ([grid-inputs potential-radius n-potential-connections grid-minicols i-minicol rng]
+  ([grid-inputs potential-radius n-pool grid-minicols minicol rng]
 
    (htm.grid/sample-hypercube grid-inputs
-                              (htm.grid/hypercube* grid-inputs
-                                                   potential-radius
-                                                   (htm.grid/relative-coords grid-inputs
-                                                                             grid-minicols
-                                                                             (htm.grid/f-index->coords grid-minicols
-                                                                                                       i-minicol)))
-                              n-potential-connections
+                              (->> (htm.grid/f-index->coords grid-minicols
+                                                             minicol)
+                                   (htm.grid/relative-coords grid-inputs
+                                                             grid-minicols)
+                                   (htm.grid/hypercube* grid-inputs
+                                                        potential-radius))
+                              n-pool
                               rng)))
 
 
 
 
-(defn global-potential-pool
+(defn global-pool
 
-  "Samples `n-potential-connections´ from the whole input space."
+  "Creates a `pool` by sampling `input`s from the whole `grid-inputs`."
 
-  ([grid-inputs n-potential-connections]
+  ([grid-inputs n-pool]
 
-   (global-potential-pool grid-inputs
-                          n-potential-connections
-                          rand))
+   (global-pool grid-inputs
+                n-pool
+                 rand))
 
 
-  ([grid-inputs n-potential-connections rng]
+  ([grid-inputs n-pool rng]
 
    (htm.grid/sample-grid grid-inputs
-                         n-potential-connections
+                         n-pool
                          rng)))
 
 
 
 
-(defn random-connections
+(defn input-pool-mapping
 
-  "Returns a random vector of `n-potential` connections with `n-connections`."
+  "Given `pools`, returns `perm-mapping`."
 
-  ([n-potential n-connections]
+  [n-inputs pools]
 
-   (random-connections n-potential
-                       n-connections
-                       rand))
-
-
-  ([n-potential n-connections rng]
-
-   (htm.math/durstenfeld-shuffle rng
-                                 (concat (repeat n-connections
-                                                 true)
-                                         (repeat (- n-potential
-                                                    n-connections)
-                                                 false)))))
+  (reduce-kv (fn pool-view [ipools minicol pool]
+               (reduce-kv (fn update-ipool [ipools' i input]
+                            (update ipools'
+                                    input
+                                    conj
+                                    [minicol i]))
+                          ipools
+                          pool))
+             (vec (repeat n-inputs
+                          []))
+             pools))
 
 
 
 
-(defn init-permanences
+(defn perms
 
-  "Returns a sequence of `n-potential` permanence values. Around `connection-density` percent should be above `connection-threshold`.
-   Those permanences will span between `connection-threshold` +/- `connection-delta`.
+  "Returns a sequence of `perms` size `n-pool` where `n-cnxs` values are above `cnx-threshold`. All values are within `cnx-threshold`
+   +/- `cnx-delta`.
   
-   Keep in mind `n-connections` should be >= the stimulus threshold later used otherwise the mini-column associated with those
-   initial permanences will not have a chance of ever be considered active."
-
-  ;; In order to symplify the work, the returned sequences contains the connected permanences first and disconnected last.
-
+   Keep in mind `n-cnxs` should be >= `stimulus-threshold` later used otherwise the `minicol` associated with those intiial `perms`
+   will not have a chance of ever be considered active."
 
   ;; TODO. Connections are often weighted by the distance between i-minicol and i-input, which requires the dimensionality
   ;; of the input-space as well as the dimensionality the mini-columnar topography. Typically, a mini-column is supposed
@@ -186,153 +200,58 @@
   ;; MAYBEDO. In the Python implementation, connections < some small threshold called 'synPermTrimThreshold' are zeroed
   ;; for "reducing memory requirements". Unclear how that would help here
 
-  ([n-potential n-connections connection-threshold connection-delta]
+  ([n-pool n-cnxs cnx-threshold cnx-delta]
 
-   (init-permanences n-potential
-                     n-connections
-                     connection-threshold
-                     connection-delta
-                     rand))
+   (perms n-pool
+          n-cnxs
+          cnx-threshold
+          cnx-delta
+          rand))
 
 
-  ([n-potential n-connections connection-threshold connection-delta rng]
+  ([n-pool n-cnxs cnx-threshold cnx-delta rng]
 
-   (map (fn permanence [connected?]
-          (let [connection-delta' (* connection-delta
-                                     (rng))]
-            (htm.math/fit-to-range (+ connection-threshold
+   (map (fn perm [connected?]
+          (let [cnx-delta' (* cnx-delta
+                              (rng))]
+            (htm.math/fit-to-range 0
+                                   1
+                                   (+ cnx-threshold
                                       (if connected?
-                                        connection-delta'
-                                        (- connection-delta'))))))
-        (random-connections n-potential
-                            n-connections
-                            rng))))
+                                        cnx-delta'
+                                        (- cnx-delta'))))))
+        (htm.math/durstenfeld-shuffle rng
+                                      (concat (repeat n-cnxs
+                                                      true)
+                                              (repeat (- n-pool
+                                                         n-cnxs)
+                                                      false))))))
 
 
 
 
-(defn global-mapping
+(defn overlap-scores
 
-  "Returns a vector of where each index is a `i-input` point to a vector of [i-minicol permanence]."
+  "Given `active-inputs`, returns `overlap-scores`."
 
-  [grid-inputs grid-minicols n-potential n-connections connection-threshold connection-delta rng]
+  [cnx-threshold perm-table input-pool-mapping active-inputs]
 
-  (reduce (fn init-minicol [i-inputs i-minicol]
-            (reduce (fn add-minicol [i-inputs' [i-input permanence]]
-                      (assoc i-inputs'
-                             i-input
-                             (conj (get i-inputs'
-                                        i-input)
-                                   [i-minicol permanence])))
-                    i-inputs
-                    (partition 2
-                               (interleave (global-potential-pool grid-inputs
-                                                                  n-potential
-                                                                  rng)
-                                           (init-permanences n-potential
-                                                             n-connections
-                                                             connection-threshold
-                                                             connection-delta
-                                                             rng)))))
-          (vec (repeat (htm.grid/grid-capacity grid-inputs)
-                       []))
-          (range (htm.grid/grid-capacity grid-minicols))))
-
-
-
-
-(defn overlap-score
-
-  "Given a sequence of `fi-inputs`, computes the `overlap-score` for every mini-column."
-
-  [connection-threshold global-mapping fi-inputs]
-
-  (reduce (fn compute-fi-input [i-minicol->overlap-score fi-input]
-            (reduce (fn update-minicol [i-minicol->overlap-score' [i-minicol perm]]
-                      (if (>= perm
-                              connection-threshold)
-                        (assoc i-minicol->overlap-score'
-                               i-minicol
-                               (inc (get i-minicol->overlap-score'
-                                         i-minicol
-                                         0)))
-                        i-minicol->overlap-score'))
-                    i-minicol->overlap-score
-                    (get global-mapping
-                         fi-input)))
-          {}
-          fi-inputs))
-
-
-
-
-(defn overlap-score-2
-
-  "Given a sequence of `fi-inputs`, computes the `overlap-score` for every mini-column."
-
-  [connection-threshold n-minicols global-mapping fi-inputs]
-
-  (reduce (fn compute-fi-input [i-minicol->overlap-score fi-input]
-            (reduce (fn update-minicol [^ints i-minicol->overlap-score' [i-minicol perm]]
-                      (when (>= perm
-                                connection-threshold)
-                        (aset-int i-minicol->overlap-score'
-                                  i-minicol
-                                  (inc (aget i-minicol->overlap-score'
-                                             i-minicol))))
-                      i-minicol->overlap-score')
-                    i-minicol->overlap-score
-                    (get global-mapping
-                         fi-input)))
-          (int-array n-minicols)
-          fi-inputs))
-
-
-
-
-(defn overlap-score-3
-
-  "Given a sequence of `fi-inputs`, computes the `overlap-score` for every mini-column."
-
-  [connection-threshold n-minicols global-mapping fi-inputs]
-
-  (let [i-minicol->overlap-score (int-array n-minicols)]
-    (dotimes [i (count fi-inputs)]
-      (let [minicol-perms (get global-mapping
-                               i)]
-        (dotimes [j (count minicol-perms)]
-          (let [[i-minicol
-                 perm]     (get minicol-perms
-                                j)]
-            (when (>= perm
-                      connection-threshold)
-              (aset-int i-minicol->overlap-score
-                        i-minicol
-                        (inc (aget i-minicol->overlap-score
-                                   i-minicol))))))))
-    i-minicol->overlap-score))
-
-
-
-
-(defn overlap-score-4
-
-  "Given a sequence of `fi-inputs`, computes the `overlap-score` for every mini-column."
-
-  [connection-threshold n-minicols global-mapping fi-inputs]
-
-  (let [i-minicol->overlap-score (int-array n-minicols)]
-    (doseq [fi-input fi-inputs]
-      (doseq [[i-minicol
-               perm]     (get global-mapping
-                              fi-input)]
-        (when (>= perm
-                  connection-threshold)
-          (aset-int i-minicol->overlap-score
-                    i-minicol
-                    (inc (aget i-minicol->overlap-score
-                               i-minicol))))))
-    i-minicol->overlap-score))
+  (reduce (fn each-input [overlap-scores active-input]
+            (reduce (fn update-count [overlap-scores' [minicol perm-pos]]
+                      (if (>= (get-in perm-table
+                                      [minicol
+                                       perm-pos])
+                              cnx-threshold)
+                        (update overlap-scores'
+                                minicol
+                                inc)
+                        overlap-scores'))
+                    overlap-scores
+                    (get input-pool-mapping
+                         active-input)))
+          (vec (repeat (count perm-table)
+                       0))
+          active-inputs))
 
 
 
@@ -345,24 +264,25 @@
   ;; TODO. Tie breaking, possiblity by using unstable sorting.
   ;; TODO. Stimulus threshold.
 
-  [i-minicol->overlap n-active]
+  [overlap-scores n-active]
 
   (take n-active
-        (sort-by (fn by-overlap [[_i-minicol overlap-score]]
-                   overlap-score)
+        (sort-by overlap-scores
                  (reify java.util.Comparator
 
                    (compare [_ x y]
                      (- (compare x
                                  y))))
-                 i-minicol->overlap)))
+                 (range (count overlap-scores)))))
 
 
 
 
 (defn avg-inputs-minicols-ratio
 
-  "Computes, on average, the number of mini-columns existing for every input bit."
+  "Computes, on average, the number of mini-columns existing for every input bit.
+  
+   Needed for computing the `inhibition-radius`."
 
   [grid-inputs grid-minicols]
 
@@ -373,56 +293,52 @@
 
 
 
-(defn fi-minicol->connections
+(defn cnxs
 
-  "Returns a vector of `fi-minicol` -> vector of `fi-inputs` with established connections."
+  "Returns a vector where indices are `minicol`s and items are vectors of `input`s with established connections."
 
-  [n-minicols connection-threshold mapping]
+  [cnx-threshold pools perm-table]
 
-  (reduce-kv (fn by-fi-input [fi-minicol->fi-inputs fi-input minicol-permanences]
-               (reduce (fn by-fi-minicol [fi-minicol->fi-inputs' [fi-minicol perm]]
-                         (if (>= perm
-                                 connection-threshold)
-                           (update fi-minicol->fi-inputs'
-                                   fi-minicol
-                                   conj
-                                   fi-input)
-                           fi-minicol->fi-inputs'))
-                       fi-minicol->fi-inputs
-                       minicol-permanences))
-             (vec (repeat n-minicols
-                          []))
-             mapping))
+  (mapv (fn filter-connected [pool perms]
+          (filterv some?
+                   (map (fn only-connected [input perm]
+                          (when (>= perm
+                                    cnx-threshold)
+                            input))
+                        pool
+                        perms)))
+        pools
+        perm-table))
 
 
 
 
 (defn receptive-field
 
-  "Given a list of `fi-input` of established connections, computes the receptive field of a mini-column."
+  "Given a list of `input`s with established connections, computes the `receptive-field` of a `minicol`."
 
-  [grid-inputs connections]
+  [grid-inputs minicol-cnxs]
 
   (htm.grid/dim-span (htm.grid/dim-ranges grid-inputs
                                           (map (fn to-coords [fi-input]
                                                  (htm.grid/f-index->coords grid-inputs
                                                                            fi-input))
-                                               connections))))
+                                               cnxs))))
 
 
 
 
 (defn inhibition-radius
 
-  "Computes the inhibition radius for local inhibition."
+  "Computes the `inhibition-radius` for local inhibition."
 
-  [grid-inputs avg-inputs-minicols-ratio fi-minicol->connections]
+  [grid-inputs avg-inputs-minicols-ratio cnxs]
 
   (let [avg-receptive-field (htm.math/mean (map htm.math/mean
-                                                (map (fn compute-rf [connections]
+                                                (map (fn compute-rf [minicol-cnxs]
                                                        (receptive-field grid-inputs
-                                                                        connections))
-                                                     fi-minicol->connections)))
+                                                                        minicol-cnxs))
+                                                     cnxs)))
         diameter            (* avg-receptive-field
                                avg-inputs-minicols-ratio)]
     (max (htm.math/round (/ (dec diameter)
@@ -439,32 +355,63 @@
   ;; TODO. Tie breaking by favoring already active mini-columns.
   ;; TODO. Stimulus threshold.
 
-  [grid-minicols n-active inhibition-radius fi-minicol->overlap-score]
+  [grid-minicols n-active inhibition-radius overlap-scores]
 
-  (reduce-kv (fn ??? [active-minicols fi-minicol overlap-score]
+  (reduce-kv (fn against-neighors [active-minicols minicol overlap-score]
                (let [neighborhood  (htm.grid/hypercube* grid-minicols
                                                         inhibition-radius
                                                         (htm.grid/f-index->coords grid-minicols
-                                                                                  fi-minicol))
+                                                                                  minicol))
                      ;; TODO. Not always true, depends if the hypercube is wrapping or not.
                      n-neighbors   (Math/pow inhibition-radius
                                              (count grid-minicols))]
-                 (loop [fi-neighbor      0
+                 (loop [neighbor         0
                         n-bigger-overlap 0]
-                   (if (< fi-neighbor
+                   (if (< neighbor
                           n-neighbors)
-                     (let [n-bigger-overlap' (if (> (get fi-minicol->overlap-score
+                     (let [n-bigger-overlap' (if (> (get overlap-scores
                                                          (htm.grid/f-index->coords-hypercube neighborhood
-                                                                                             fi-neighbor))
+                                                                                             neighbor))
                                                     overlap-score)
                                                (inc n-bigger-overlap)
                                                n-bigger-overlap)]
                        (if (< n-bigger-overlap'
                               n-active)
-                         (recur (inc fi-neighbor)
+                         (recur (inc neighbor)
                                 n-bigger-overlap')
                          active-minicols))
                      (conj active-minicols
-                           fi-minicol)))))
+                           minicol)))))
              []
-             fi-minicol->overlap-score))
+             overlap-scores))
+
+
+
+
+(defn adapt-perms
+
+  "Spatial learning, adapts permanences of `active-minicols`."
+
+  [perm- perm+ n-inputs pools active-inputs perm-table active-minicols]
+
+  (let [perm-updates (reduce (fn ??? [perm-updates input]
+                               (assoc perm-updates
+                                      input
+                                      perm+))
+                             (vec (repeat (count n-inputs)
+                                          (- perm-)))
+                             active-inputs)]
+    (reduce (fn update-minicol [perm-table' active-minicol]
+              (update perm-table'
+                      active-minicol
+                      (fn update-perms [perms]
+                        (mapv (fn update-perm [i perm]
+                                (htm.math/fit-to-range 0
+                                                       1
+                                                       (+ perm
+                                                          (get perm-updates
+                                                               i))))
+                              (range (count perms))
+                              perms))))
+            perm-table
+            active-minicols)))
