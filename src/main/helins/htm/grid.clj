@@ -1,4 +1,9 @@
-(ns dvlopt.htm.grid
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+
+(ns helins.htm.grid
 
   "Regular cartesian grids.
   
@@ -57,9 +62,7 @@
   
   {:author "Adam Helinski"}
 
-  (:require [dvlopt.htm.math :as htm.math]))
-
-
+  (:require [helins.htm.math :as htm.math]))
 
 
 ;;;;;;;;;; Coordinates and flat-indexes

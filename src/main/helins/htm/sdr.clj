@@ -1,18 +1,20 @@
-(ns dvlopt.htm.sdr
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+
+(ns helins.htm.sdr
 
   "Create and act on Sparse Distributed Representations.
 
 
-   Cf. `dvlopt.htm.sdr.props`"
+   Cf. `helins.htm.sdr.props`"
 
   {:author "Adam Helinski"}
 
-  (:require [dvlopt.htm           :as htm]
-            [dvlopt.htm.sdr.props :as htm.sdr.props]
-            [dvlopt.void          :as void])
+  (:require [helins.htm           :as htm]
+            [helins.htm.sdr.props :as htm.sdr.props])
   (:import clojure.lang.Seqable))
-
-
 
 
 ;;;;;;;;;; Protocol
@@ -139,9 +141,8 @@
 
   ([options]
 
-   (immutable-SDR-from (repeat (void/obtain ::capacity
-                                            options
-                                            htm/defaults)
+   (immutable-SDR-from (repeat (or (::capacity options)
+                                   (::capacity htm/defaults))
                                false))))
 
 
@@ -255,7 +256,7 @@
 
   [overlap-score sdr-1 sdr-2]
 
-  (>= (dvlopt.htm.sdr/overlap-score sdr-1
+  (>= (helins.htm.sdr/overlap-score sdr-1
                                     sdr-2)
       overlap-score))
 

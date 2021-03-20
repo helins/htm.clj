@@ -1,4 +1,9 @@
-(ns dvlopt.htm.space
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+
+(ns helins.htm.space
 
   "Spatial pooling.
   
@@ -44,10 +49,10 @@
        Treshold for deciding if a `perm` is strong enough for establishing a `cnx`.
 
      flat-index
-       Cf. `flat-index` in `dvlopt.htm.grid` namespace.
+       Cf. `flat-index` in `helins.htm.grid` namespace.
 
      grid
-       Cf. `grid` in `dvlopt.htm.grid` glossary.
+       Cf. `grid` in `helins.htm.grid` glossary.
 
      grid-inputs
        `grid` describing the topology of the input space.
@@ -98,15 +103,12 @@
      stimulus-threshold
        During inference, in order for a mini-column to even be considered potentially active, it must have an `overlap-score` of at least that much. During
        initialization, it is important to garantee that at least `stimulus-threshold` connections are randomly established for each mini-column otherwise
-       they will never have the chance to compete. This parameter is a measure against noise and should be low. It could even be 0.
-  "
+       they will never have the chance to compete. This parameter is a measure against noise and should be low. It could even be 0."
 
   {:author "Adam Helinski"}
 
-  (:require [dvlopt.htm.grid :as htm.grid]
-            [dvlopt.htm.math :as htm.math]))
-
-
+  (:require [helins.htm.grid :as htm.grid]
+            [helins.htm.math :as htm.math]))
 
 
 ;;;;;;;;;;
@@ -256,6 +258,65 @@
 
 
 
+(defn active-duty-cycles
+
+  ""
+
+  [n-minicols]
+
+  (vec (repeat n-minicols)
+       0))
+
+
+
+
+(defn update-duty-cycle
+
+  ""
+
+  [period duty-cycles updates]
+
+  (mapv (fn with-update [duty-cycle updte]
+          (/ (+ (* (dec period)
+                   duty-cycle)
+                updte)
+             period))
+        duty-cycles
+        updates))
+
+
+
+(defn update-active-duty-cycles
+
+  ""
+
+  [period active-minicols active-duty-cycles]
+
+  (update-duty-cycle period
+                     active-duty-cycles
+                     (reduce (fn set-update [updates active-minicol]
+                               (assoc updates
+                                      active-minicol
+                                      1))
+                             (vec (repeat (count active-duty-cycles)
+                                          0))
+                             active-minicols)))
+
+
+
+
+(defn boost-factors
+
+  ""
+
+  [n-minicols]
+
+  (vec (repeat n-minicols
+               1)))
+
+
+
+
 (defn global-inhibition
 
   "Using `overlap-score`s of mini-columns, performs global inhibition by selecting `n-active` `i-minicols` with
@@ -394,7 +455,7 @@
 
   [perm- perm+ n-inputs pools active-inputs perm-table active-minicols]
 
-  (let [perm-updates (reduce (fn ??? [perm-updates input]
+  (let [perm-updates (reduce (fn incrementing [perm-updates input]
                                (assoc perm-updates
                                       input
                                       perm+))

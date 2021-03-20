@@ -1,10 +1,15 @@
-(ns dvlopt.htm.sdr.props
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+
+(ns helins.htm.sdr.props
 
   "Properties of Sparse Distributed Representations (SDRs).
 
 
    It is a good practise to learn this namespace as SDRs are omnipresent in HTM. It introduces definitions and basic concepts.
-   The `dvlopt.htm.sdr` namespace is about creating and acting on concrete SDRs whereas this namespace is about the theory.
+   The `helins.htm.sdr` namespace is about creating and acting on concrete SDRs whereas this namespace is about the theory.
   
 
    Based on :
@@ -14,9 +19,7 @@
 
   {:author "Adam Helinski"}
 
-  (:require [dvlopt.htm.math :as htm.math]))
-
-
+  (:require [helins.htm.math :as htm.math]))
 
 
 ;;;;;;;;;; Functions computing some useful properties

@@ -1,4 +1,9 @@
-(ns dvlopt.htm.encoder
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+
+(ns helins.htm.encoder
 
   "Encoders mapping arbitrary values to SDRs.
 
@@ -17,12 +22,10 @@
 
   {:author "Adam Helinski"}
 
-  (:require [dvlopt.htm           :as htm]
-            [dvlopt.htm.sdr       :as htm.sdr]
-            [dvlopt.htm.sdr.props :as htm.sdr.props]
-            [dvlopt.htm.math      :as htm.math]))
-
-
+  (:require [helins.htm           :as htm]
+            [helins.htm.sdr       :as htm.sdr]
+            [helins.htm.sdr.props :as htm.sdr.props]
+            [helins.htm.math      :as htm.math]))
 
 
 ;;;;;;;;;; Make encoders
